@@ -132,7 +132,7 @@ int draw() {
     glEnableVertexAttribArray(textureLoc);
 
     glUniform1i(yuvtextLoc, 0);
-
+    glActiveTexture(GL_TEXTURE0 + 0);
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
     
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, drawOrder);
