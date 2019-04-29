@@ -11,11 +11,11 @@
 
 #include <utils/Log.h>
 #include "IMediaEncode.h"
-#include <binder/IPCThreadState.h>  
+#include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 
 #include <ui/GraphicBuffer.h>
-
+#include <gui/DisplayEventReceiver.h>
 
 #include <dlfcn.h>
 
@@ -31,7 +31,7 @@ GLuint textureID = -1;// texture id
 GLint  vertexLoc = -1;// gpu vertex handle
 GLint  textureLoc = -1;//gpu texture handle
 GLint  yuvtextLoc = -1;//gpu yuv texture handle
-GLint drawOrder[] = { 0, 1, 2, 0, 2, 3 }; 
+GLint drawOrder[] = { 0, 1, 2, 0, 2, 3 };
 // vertex array
 GLfloat vextexData[] = {
        -1.0f,  -1.0f,
@@ -39,7 +39,7 @@ GLfloat vextexData[] = {
         1.0f, 1.0f,
         -1.0f,  1.0f,
 };
-//顶点颜色数组  
+//顶点颜色数组
 float colorData[] = {
         0.0f, 1.0f,
         1.0f, 1.0f,
@@ -68,13 +68,13 @@ const char* fragmentShaderCode =
 
 
 int useShader(const char *shader, GLenum type, GLuint *vShader) {
-//创建着色器对象：顶点着色器  
+//创建着色器对象：顶点着色器
 	  vShader[0] = glCreateShader(type);
 //将字符数组绑定到对应的着色器对象上
 	  glShaderSource(vShader[0], 1, &shader, NULL);
-//编译着色器对象  
+//编译着色器对象
     glCompileShader(vShader[0]);
-//检查编译是否成功  
+//检查编译是否成功
     GLint compileResult;
     glGetShaderiv(vShader[0], GL_COMPILE_STATUS, &compileResult);
     if (GL_FALSE == compileResult) {
@@ -100,6 +100,11 @@ int useProgram() {
     glAttachShader(programID, fragmentShader);
 
     glLinkProgram(programID);
+
+    glDeleteShader(vertexShader);
+	glDeleteShader(fragmentShader);
+    vertexShader = -1;
+    fragmentShader = -1;
 
     vertexLoc = glGetAttribLocation(programID, "aPosition");
     textureLoc = glGetAttribLocation(programID, "aTextureCoord");
@@ -134,7 +139,7 @@ int draw() {
     glUniform1i(yuvtextLoc, 0);
     glActiveTexture(GL_TEXTURE0 + 0);
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
-    
+
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, drawOrder);
 
     glDisableVertexAttribArray(vertexLoc);
@@ -199,21 +204,21 @@ int getYUV12Data(FILE *fp, unsigned char * pYUVData,int size, int nY4M) {
 
 
 //testVB 352 288 /sdcard/akiyo_cif.yuv
-int main(int argc, char** argv)  
-{   
+int main(int argc, char** argv)
+{
     if (argc < 3) {
-   
+
       printf("please input w h and yuv file\n");
-      
+
       return -1;
     }
-    
+
     printf("input w %s h %s" , argv[1] , argv[2]);
     int width  = atoi(argv[1]);
     int height = atoi(argv[2]);
     const char *yuvfile = argv[3];
     int yuv = 0;
-   /* 
+   /*
     if (argc == 4) {
         yuvfile = argv[3] ;
         yuv = 1;
@@ -221,7 +226,7 @@ int main(int argc, char** argv)
         getIMediaEncodeType getIMediaEncodeFn = (getIMediaEncodeType) GetFunction("libMediaEncode.so", "getIMediaEncode");
         IMediaEncode *mediaEncode = getIMediaEncodeFn();
         ANativeWindow* window = (ANativeWindow*) mediaEncode->onCreate(mediaEncode, "media surface", width, height, yuv);
-      
+
         mediaEncode->onEncode(mediaEncode);
 
         mediaEncode->onSetData(mediaEncode, yuvfile, width, height);
@@ -250,6 +255,12 @@ int main(int argc, char** argv)
           return -2;
         }
         printf("\n");
+        DisplayEventReceiver mReceiver;
+        if (mReceiver.initCheck() != NO_ERROR) {
+            printf("DisplayEventReceiver error\n");
+            return -3;
+        }
+        mReceiver.setVsyncRate(1);
 
         getIMediaEncodeType getIMediaEncodeFn = (getIMediaEncodeType) GetFunction("libMediaEncode.so", "getIMediaEncode");
         IMediaEncode *mediaEncode = getIMediaEncodeFn();
@@ -259,16 +270,18 @@ int main(int argc, char** argv)
 
         mEglSurface = eglCreateWindowSurface(mEglDisplay, mGlConfig, window , NULL);
         mEglContext = eglCreateContext(mEglDisplay, mGlConfig, EGL_NO_CONTEXT, contextAttribs);
+
+        eglSurfaceAttrib(mEglDisplay, mEglSurface, EGL_RENDER_BUFFER, EGL_SINGLE_BUFFER);
+
         eglMakeCurrent(mEglDisplay, mEglSurface, mEglSurface, mEglContext);
 
 
-        const int yuvTexUsage = GraphicBuffer::USAGE_HW_TEXTURE |
-                GraphicBuffer::USAGE_SW_WRITE_RARELY;
+        const int yuvTexUsage = GraphicBuffer::USAGE_SW_WRITE_RARELY;
         const int yuvTexFormat = HAL_PIXEL_FORMAT_YV12;
         GraphicBuffer*  yuvTexBuffer = new GraphicBuffer(width, height, yuvTexFormat, yuvTexUsage);
         EGLClientBuffer clientBuffer = (EGLClientBuffer)yuvTexBuffer->getNativeBuffer();
         EGLImageKHR img = eglCreateImageKHR(mEglDisplay, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, 0);
-        
+
         textureID = useTextureID();
         glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, (GLeglImageOES)img);
 
@@ -281,9 +294,9 @@ int main(int argc, char** argv)
 
         FILE *fp = fopen(yuvfile,"rb");
         printf("fopen %s\n", yuvfile);
-        if(fp == NULL){  
+        if(fp == NULL){
             printf("read %s fail !!!!!!!!!!!!!!!!!!!\n",yuvfile);
-            return -2;  
+            return -2;
         }
 
         int nY4M = 0;
@@ -293,30 +306,54 @@ int main(int argc, char** argv)
             char buffer[6] = "FRAME";
             buffer[5] = '\0';
             char temp[10] = "\0" ;
-            
-            while(memcmp(buffer, temp, 5) != 0) { 
+
+            while(memcmp(buffer, temp, 5) != 0) {
                 if (fscanf(fp, "%s ", temp) <= 0)
                   break;
-                
-                printf("source %s dest %s\n", buffer, temp);   
+
+                printf("source %s dest %s\n", buffer, temp);
             }
         }
-        int size = width * height * 3/2;  
+        int size = width * height * 3/2;
         int64_t nowTime = systemTime(CLOCK_MONOTONIC) / 1000, curTime, diff;
 
         unsigned char* buf = NULL;
-        status_t err; 
+        status_t err;
+        DisplayEventReceiver::Event  event ;
+        //int fd = mReceiver->getFd() ;
+        size_t sz = 0, count = 1;
+        fd_set fds;
+        struct timeval timeout={1,0};
+        int sockid = mReceiver.getFd();
         for (int i = 0;; ++i) {
+            FD_ZERO(&fds); //每次循环都要清空集合，否则不能检测描述符变化
+            FD_SET(sockid, &fds); //添加描述符
+            int code = select(sockid + 1, &fds, NULL, NULL, &timeout);
+            if (code <= 0) {
+                continue;
+            }
+            sz = mReceiver.getEvents(&event, count);
+            if (sz <= 0) {
+                continue;
+            }
+            printf("event[%x %x %lX %x]\n", event.header.type, event.header.id, event.header.timestamp, event.vsync.count);
+
             err = yuvTexBuffer->lock(GRALLOC_USAGE_SW_WRITE_OFTEN, (void**)(&buf));
 
             if (getYUV12Data(fp, buf, size, nY4M) != 0) {//get yuv data from file;
                 printf("[%s][%d] count %d file read over\n",__FILE__,__LINE__, i);
+
+                err = yuvTexBuffer->unlock();
                 break;
             }
             err = yuvTexBuffer->unlock();
 
             draw();
-            eglSwapBuffers(mEglDisplay, mEglSurface);
+
+            glFlush();
+
+            //eglSwapBuffers(mEglDisplay, mEglSurface);
+
             curTime = systemTime(CLOCK_MONOTONIC) / 1000;
             diff = curTime - nowTime;
             printf("timestamp %lX %lX render\n", curTime / 1000, diff / 1000);
@@ -324,7 +361,7 @@ int main(int argc, char** argv)
               usleep(16000 - diff);
             nowTime = curTime;
         }
-        
+
         fclose(fp);
 
 /*
@@ -365,7 +402,7 @@ int main(int argc, char** argv)
 
   //  }
 
-    IPCThreadState::self()->joinThreadPool();      
-    IPCThreadState::self()->stopProcess();  
+    IPCThreadState::self()->joinThreadPool();
+    IPCThreadState::self()->stopProcess();
     return 0;
 }

@@ -5,8 +5,13 @@
 #include <stdio.h>
 #include <gui/BufferItem.h>
 #include <ui/GraphicBuffer.h>
-#include <utils/Log.h>
- 
+
+#ifdef PLATFORM_VERSION_7
+#include <utils/Log.h> 
+#endif
+#ifdef PLATFORM_VERSION_8
+#include <log/log.h>
+#endif
  
 FrameListener::FrameListener() : mPendingFrames(0) {
 }

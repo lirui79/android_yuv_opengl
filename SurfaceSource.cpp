@@ -1,7 +1,15 @@
 #include "SurfaceSource.h"
 #include <gui/IProducerListener.h>
 #include <media/openmax/OMX_IVCommon.h>
+
+#ifdef PLATFORM_VERSION_7
 #include <media/stagefright/foundation/ABuffer.h>
+#endif
+
+#ifdef PLATFORM_VERSION_8
+#include <media/MediaCodecBuffer.h>
+#endif
+
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/PersistentSurface.h>
@@ -9,8 +17,8 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/ICrypto.h>
 #include <string.h>
-
-#include <utils/Log.h>
+#include <inttypes.h>
+#include <log/log.h>
 
 SurfaceSource::SurfaceSource() : yuv(0) {        
 }
@@ -78,8 +86,14 @@ void SurfaceSource::render(const void *data, size_t size,int width,int height) {
     int slot = -1;
     sp<Fence> fence;
     sp<GraphicBuffer> buffer;
-    int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_HW_VIDEO_ENCODER; //| GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER;
+    int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN ; //| GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER;
+#ifdef PLATFORM_VERSION_7
     inputProducer->dequeueBuffer(&slot, &fence, width, height, HAL_PIXEL_FORMAT_YV12, usage);//HAL_PIXEL_FORMAT_YV12
+#endif
+
+#ifdef PLATFORM_VERSION_8
+    inputProducer->dequeueBuffer(&slot, &fence, width, height, HAL_PIXEL_FORMAT_YV12, usage, NULL, NULL);//HAL_PIXEL_FORMAT_YV12
+#endif
 
     inputProducer->requestBuffer(slot, &buffer);
 
@@ -103,10 +117,24 @@ void SurfaceSource::setdata(sp<IGraphicBufferProducer> inputgbp, android_dataspa
 
     if (yuv == 0) {
         int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN;  
+#ifdef PLATFORM_VERSION_7
         inputgbp->dequeueBuffer(&slot, &fence, width, height, HAL_PIXEL_FORMAT_RGBA_8888, usage);
+#endif
+
+#ifdef PLATFORM_VERSION_8
+        inputgbp->dequeueBuffer(&slot, &fence, width, height, HAL_PIXEL_FORMAT_RGBA_8888, usage, NULL, NULL);
+#endif
+
     } else {
-        int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_HW_VIDEO_ENCODER; 
+        int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN; 
+#ifdef PLATFORM_VERSION_7
         inputgbp->dequeueBuffer(&slot, &fence, width, height, HAL_PIXEL_FORMAT_YV12, usage);// HAL_PIXEL_FORMAT_YV12 HAL_PIXEL_FORMAT_YCbCr_420_888
+#endif
+
+#ifdef PLATFORM_VERSION_8
+        inputgbp->dequeueBuffer(&slot, &fence, width, height, HAL_PIXEL_FORMAT_YV12, usage, NULL, NULL);// HAL_PIXEL_FORMAT_YV12 HAL_PIXEL_FORMAT_YCbCr_420_888
+#endif
+
     }
 
     inputgbp->requestBuffer(slot, &buffer);
@@ -128,8 +156,14 @@ void SurfaceSource::setdata(sp<IGraphicBufferProducer> inputgbp, struct BufferIn
     int slot = -1;
     sp<Fence> fence;
     sp<GraphicBuffer> buffer;
-    int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_HW_VIDEO_ENCODER; 
+    int usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN; 
+#ifdef PLATFORM_VERSION_7
     inputgbp->dequeueBuffer(&slot, &fence, buf->width, buf->height, buf->format, usage);
+#endif
+
+#ifdef PLATFORM_VERSION_8
+    inputgbp->dequeueBuffer(&slot, &fence, buf->width, buf->height, buf->format, usage, NULL, NULL);
+#endif
 
     inputgbp->requestBuffer(slot, &buffer);
 
@@ -144,7 +178,7 @@ void SurfaceSource::setdata(sp<IGraphicBufferProducer> inputgbp, struct BufferIn
     buffer->unlock();
     inputgbp->queueBuffer(slot, input, &output);
     int64_t nowTime = systemTime(CLOCK_MONOTONIC);
-    ALOGI("SurfaceSource::setdata %lld  %lld %lld", nowTime, buf->timestamp, (nowTime - buf->timestamp)/1000000);
+    ALOGI("SurfaceSource::setdata %" PRId64 "  %" PRId64 " %" PRId64 " ", nowTime, buf->timestamp, (nowTime - buf->timestamp)/1000000);
 
 }  
 
@@ -162,7 +196,7 @@ int SurfaceSource::setRGBAData(int width, int height) {
         setdata(inputProducer, HAL_DATASPACE_UNKNOWN, data, 4 * size, width, height);
         curTime = systemTime(CLOCK_MONOTONIC) / 1000;
         diff = curTime - nowTime;
-        ALOGI("timestamp %lX %lX render\n", curTime / 1000, diff / 1000);
+        ALOGI("timestamp %" PRId64 " %" PRId64 " render\n", curTime / 1000, diff / 1000);
         if (diff < 16000)
            usleep(16000 - diff);
         nowTime = curTime;
@@ -217,7 +251,7 @@ int SurfaceSource::setData(const char *fileName, int width, int height) {
         setdata(inputProducer, HAL_DATASPACE_UNKNOWN, data, size, width, height);
         curTime = systemTime(CLOCK_MONOTONIC) / 1000;
         diff = curTime - nowTime;
-        ALOGI("timestamp %lX %lX render\n", curTime / 1000, diff / 1000);
+        ALOGI("timestamp %" PRId64 " %" PRId64 " render\n", curTime / 1000, diff / 1000);
         if (diff < 16000)
            usleep(16000 - diff);
         nowTime = curTime;
@@ -287,8 +321,16 @@ int  SurfaceSource::setBuffer(const void *data, size_t size, int width, int heig
     }
 
     int64_t nowTime = systemTime(CLOCK_MONOTONIC) / 1000000;
-    ALOGI("dequeueInputBuffer after %zu  %zu\n", nowTime, timestamp/1000000);
+    ALOGI("dequeueInputBuffer after %" PRId64 "  %" PRId64 "\n", nowTime, timestamp/1000000);
+
+#ifdef PLATFORM_VERSION_7
     sp<ABuffer> buffer;
+#endif
+
+#ifdef PLATFORM_VERSION_8
+     sp<MediaCodecBuffer> buffer;
+#endif
+
     mEncoder->getInputBuffer(bufferIndex, &buffer);
     size_t offset = buffer->offset();
     ALOGI("buffer size %zu capacity %zu offset %zu  %zu\n", buffer->size(), buffer->capacity(), offset, size);
@@ -306,7 +348,7 @@ int  SurfaceSource::setBuffer(const void *data, size_t size, int width, int heig
         ALOGE("ERROR: unable to queueInputBuffer (err=%d)\n", err);
     }
     nowTime = systemTime(CLOCK_MONOTONIC) / 1000000;
-    ALOGI("queueInputBuffer size %zu pts %zu %zu\n", size, timestamp/1000000, nowTime);
+    ALOGI("queueInputBuffer size %zu pts %" PRId64 " %" PRId64 "\n", size, timestamp/1000000, nowTime);
     return 0;
 }
 
@@ -338,7 +380,7 @@ int SurfaceSource::Splitter() {
     setBuffer(buf.data, size, buf.width, buf.height, buf.timestamp, yuv);
     ALOGI("Splitter GraphicBuffer->lock %d %d %d %d %d %d\n", bufferInfo.stride, bufferInfo.width, bufferInfo.height, bpp, bufferInfo.format,bufferInfo.size);
     int64_t nowTime = systemTime(CLOCK_MONOTONIC);
-    ALOGI("SurfaceSource::Splitter %lld  %lld %lld", nowTime, bufferInfo.timestamp, (nowTime - bufferInfo.timestamp)/1000000);
+    ALOGI("SurfaceSource::Splitter %" PRId64 "  %" PRId64 " %" PRId64 " ", nowTime, bufferInfo.timestamp, (nowTime - bufferInfo.timestamp)/1000000);
     std::vector<sp<IGraphicBufferProducer> >::iterator output = mOutputs.begin();
     for (; output != mOutputs.end(); ++output) {
         setdata(*output, &bufferInfo);
@@ -352,7 +394,7 @@ int SurfaceSource::consumer_thread() {
     while(true) {
         Splitter();
         curTime = systemTime(CLOCK_MONOTONIC);
-        ALOGI("SurfaceSource::consumer_thread %lld  %lld  %lld", nowTime, curTime, (curTime - nowTime)/1000000);
+        ALOGI("SurfaceSource::consumer_thread %" PRId64 "  %" PRId64 "  %" PRId64 " ", nowTime, curTime, (curTime - nowTime)/1000000);
         nowTime = curTime;
     }
 
@@ -414,7 +456,7 @@ int SurfaceSource::encode_input_thread() {
     size_t bufferIndex = -1;
     while(true) {
         nowTime = systemTime(CLOCK_MONOTONIC) / 1000000;
-        ALOGI("dequeueInputBuffer %zu\n", nowTime);
+        ALOGI("dequeueInputBuffer %" PRId64 "\n", nowTime);
         err = encoder->dequeueInputBuffer(&bufferIndex, kTimeout);
         if (err != NO_ERROR) {
             ALOGE("ERROR: unable to dequeueInputBuffer (err=%d)\n", err);
@@ -459,10 +501,17 @@ int SurfaceSource::encode_output_thread() {
                 &flags, kTimeout);
              ALOGI("dequeueOutputBuffer %zu returned %d\n", bufIndex, err);
              if (err == NO_ERROR) {
+#ifdef PLATFORM_VERSION_7
                 sp<ABuffer> outBuffer;
+#endif
+
+#ifdef PLATFORM_VERSION_8
+                sp<MediaCodecBuffer> outBuffer;
+#endif
+                
                 mEncoder->getOutputBuffer(bufIndex, &outBuffer);
                 nowTime = systemTime(CLOCK_MONOTONIC) / 1000;
-                ALOGI("Got data in buffer %zu, size=%zu, pts=%zu time=%zu delay=%zu\n",
+                ALOGI("Got data in buffer %zu, size=%zu, pts=%" PRId64 " time=%" PRId64 " delay=%" PRId64 "\n",
                         bufIndex, size, ptsUsec, nowTime, (nowTime-ptsUsec)/1000);
                 fps += 1;
                 if (nowTime > useTime + 1000000) {

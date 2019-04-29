@@ -3,10 +3,31 @@ LOCAL_PATH:=$(call my-dir)
 
 include $(CLEAR_VARS)
 
+
+ifeq ($(PLATFORM_VERSION), 6.0.1)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_6
+endif
+
+ifeq ($(PLATFORM_VERSION), 6.0)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_6
+endif
+
+ifeq ($(PLATFORM_VERSION), 7.1.1)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_7
+endif
+
+ifeq ($(PLATFORM_VERSION), 7.1.2)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_7
+endif
+
+ifeq ($(PLATFORM_VERSION), 8.1.0)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_8
+endif
+
+
 LOCAL_SRC_FILES := \
                    SurfaceSource.cpp \
 				   SurfaceView.cpp \
-				   SurfaceEncode.cpp \
 				   FrameListener.cpp \
 				   MediaEncode.cpp \
 
@@ -37,6 +58,27 @@ include $(BUILD_SHARED_LIBRARY)
 
 
 include $(CLEAR_VARS)
+
+
+ifeq ($(PLATFORM_VERSION), 6.0.1)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_6
+endif
+
+ifeq ($(PLATFORM_VERSION), 6.0)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_6
+endif
+
+ifeq ($(PLATFORM_VERSION), 7.1.1)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_7
+endif
+
+ifeq ($(PLATFORM_VERSION), 7.1.2)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_7
+endif
+
+ifeq ($(PLATFORM_VERSION), 8.1.0)
+	LOCAL_CPPFLAGS += -DPLATFORM_VERSION_8
+endif
 
 LOCAL_SRC_FILES := main.cpp \
 

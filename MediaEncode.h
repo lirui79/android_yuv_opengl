@@ -4,7 +4,7 @@
 #include "IMediaEncode.h"
 #include "SurfaceSource.h"
 #include "SurfaceView.h"
-#include "SurfaceEncode.h"
+//#include "SurfaceEncode.h"
 
 
 class MediaEncode : public IMediaEncode {
